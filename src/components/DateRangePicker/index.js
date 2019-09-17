@@ -14,9 +14,14 @@ import { makeStyles } from "@material-ui/styles";
 import classNames from "classnames";
 import moment from "moment";
 import PropTypes from "prop-types";
-import React, { useEffect, useReducer, useState, useMemo } from "react";
+import React, {
+  useEffect,
+  useReducer,
+  useState,
+  useMemo,
+  useCallback
+} from "react";
 import createAutoCorrectedDatePipe from "text-mask-addons/dist/createAutoCorrectedDatePipe";
-import TextMaskInput from "../TextMaskInput";
 import MaskedInput from "react-text-mask";
 
 const useStyles = makeStyles(theme => ({
@@ -67,7 +72,7 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const initialErrors = {
+const INITIAL_ERROR_MESSAGES_STATE = {
   startDate: null,
   endDate: null
 };
@@ -78,6 +83,7 @@ const DATE_TYPES = {
 };
 
 const DATE_RANGE_ACTIONS = {
+  SET_START_DATE_FOR_PICKER: "setStartDateForPicker",
   SET_START_DATE: "setStartDate",
   SET_END_DATE: "setEndDate",
   RESET: "reset"
@@ -85,10 +91,15 @@ const DATE_RANGE_ACTIONS = {
 
 const dateRangeReducer = (state, { type, payload }) => {
   switch (type) {
-    case DATE_RANGE_ACTIONS.SET_START_DATE:
+    case DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER:
       return {
         [DATE_TYPES.START_DATE]: payload,
         [DATE_TYPES.END_DATE]: null
+      };
+    case DATE_RANGE_ACTIONS.SET_START_DATE:
+      return {
+        ...state,
+        [DATE_TYPES.START_DATE]: payload
       };
     case DATE_RANGE_ACTIONS.SET_END_DATE:
       return {
@@ -121,16 +132,44 @@ const DateRangePicker = ({
     minDate.getFullYear(),
     maxDate.getFullYear()
   );
-  const autoCorrectedDatePipe = createAutoCorrectedDatePipe("mm/dd/yyyy", {
-    minYear: minDate.getFullYear(),
-    maxYear: maxDate.getFullYear()
-  });
+  const autoCorrectedDatePipe = useMemo(() => {
+    return createAutoCorrectedDatePipe("mm/dd/yyyy", {
+      minYear: minDate.getFullYear(),
+      maxYear: maxDate.getFullYear()
+    });
+  }, [minDate, maxDate]);
+  const renderMaskedInput = useCallback(
+    props => {
+      const { inputRef, ...other } = props;
+
+      return (
+        <MaskedInput
+          {...other}
+          ref={ref => {
+            inputRef(ref ? ref.inputElement : null);
+          }}
+          mask={[/\d/, /\d/, "/", /\d/, /\d/, "/", /\d/, /\d/, /\d/, /\d/]}
+          placeholderChar={"\u2000"}
+          pipe={autoCorrectedDatePipe}
+          guide
+          keepCharPositions
+        />
+      );
+    },
+    [autoCorrectedDatePipe]
+  );
 
   const [dateRange, dispatchDateRange] = useReducer(
     dateRangeReducer,
     initialDateRange
   );
-  const [isStartDateClick, setIsStartDateClick] = useState(true);
+  const [dateRangeInputs, setDateRangeInputs] = useState({
+    startDate: moment(initialDateRange.startDate).format("MM/DD/YYYY") || "",
+    endDate: moment(initialDateRange.endDate).format("MM/DD/YYYY") || ""
+  });
+  const [isPickerSettingStartDate, setIsPickerSettingStartDate] = useState(
+    true
+  );
   const [year, setYear] = useState(
     moment(dateRange.startDate).isValid()
       ? moment(dateRange.startDate).year()
@@ -138,28 +177,12 @@ const DateRangePicker = ({
   );
   const [isYearDropdownChanged, setIsYearDropdownChanged] = useState(false);
   const [isMonthChanged, setIsMonthChanged] = useState(false);
-  const [errorMessages, setErrorMessages] = useState(initialErrors);
-  const [hasErrors, setHasErrors] = useState(false);
+  const [inputErrorMessages, setInputErrorMessages] = useState(
+    INITIAL_ERROR_MESSAGES_STATE
+  );
+  const [hasDateErrors, setDateErrors] = useState(false);
 
   const { startDate, endDate } = dateRange;
-
-  function renderMaskedInput(props) {
-    const { inputRef, ...other } = props;
-
-    return (
-      <MaskedInput
-        {...other}
-        ref={ref => {
-          inputRef(ref ? ref.inputElement : null);
-        }}
-        mask={[/\d/, /\d/, "/", /\d/, /\d/, "/", /\d/, /\d/, /\d/, /\d/]}
-        placeholderChar={"\u2000"}
-        pipe={autoCorrectedDatePipe}
-        guide
-        keepCharPositions
-      />
-    );
-  }
 
   const renderDayAsDateRange = (
     momentDate,
@@ -168,18 +191,19 @@ const DateRangePicker = ({
   ) => {
     const dayIsBetween = momentDate.isBetween(startDate, endDate);
     const isBeforeStartDateOnEndDateSelection =
-      momentDate.isBefore(startDate, "day") && !isStartDateClick;
+      momentDate.isBefore(startDate, "day") && !isPickerSettingStartDate;
     const isStartDate = momentDate.isSame(startDate, "day");
     const isEndDate = momentDate.isSame(endDate, "day");
+    const isYearChangedOnEndDateSelect =
+      isYearDropdownChanged &&
+      (moment(startDate).isSame(endDate) ||
+        (isMonthChanged && !isPickerSettingStartDate));
 
     const wrapperClassName = classNames({
       [classes.highlight]:
         dayInCurrentMonth && !isYearDropdownChanged && dayIsBetween,
       [classes.firstHighlight]:
-        (isYearDropdownChanged &&
-          (moment(startDate).isSame(endDate) ||
-            (isMonthChanged && !isStartDateClick)) &&
-          isStartDate) ||
+        (isYearChangedOnEndDateSelect && isStartDate) ||
         (!isYearDropdownChanged && isStartDate),
       [classes.endHighlight]: !isYearDropdownChanged && isEndDate
     });
@@ -201,19 +225,22 @@ const DateRangePicker = ({
   };
 
   const resetTrackingState = () => {
-    setIsStartDateClick(true);
+    setIsPickerSettingStartDate(true);
     setIsYearDropdownChanged(false);
     setIsMonthChanged(false);
+    setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
     moment(startDate).isValid() && setYear(startDate.getFullYear());
   };
 
   const handleYearDropdownChange = e => {
     const year = e.target.value;
-    const actionType = isStartDateClick
-      ? DATE_RANGE_ACTIONS.SET_START_DATE
+    const actionType = isPickerSettingStartDate
+      ? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
       : DATE_RANGE_ACTIONS.SET_END_DATE;
-    const momentDate = isStartDateClick ? moment(startDate) : moment(endDate);
-    const fallbackDate = isStartDateClick
+    const momentDate = isPickerSettingStartDate
+      ? moment(startDate)
+      : moment(endDate);
+    const fallbackDate = isPickerSettingStartDate
       ? moment(`${year}-01-01`, "YYYY-MM-DD").toDate()
       : moment(startDate)
           .set({ year })
@@ -231,33 +258,60 @@ const DateRangePicker = ({
     console.log("handleYearListChange", year, isYearDropdownChanged);
   };
 
-  const handleChange = momentDate => {
-    console.log("onChange");
-    /* const errors = {};
-    const key = isStartDateClick ? DATE_TYPES.START_DATE : DATE_TYPES.END_DATE;
-    errors[key] = !momentDate.isValid() ? "Invalid date" : null;
+  const handleInputChange = name => e => {
+    const { value } = e.target;
+    const errorMessages = {};
+    const momentDate = moment(value);
+    const isStartDate = name === DATE_TYPES.START_DATE;
 
-    if (isStartDateClick && momentDate > endDate) {
-      errors[key] = "Start date should not be after end date";
-    } else if (!isStartDateClick && momentDate < startDate) {
-      errors[key] = "End date should not be before start date";
+    setDateRangeInputs({
+      ...dateRangeInputs,
+      [name]: value
+    });
+
+    errorMessages[name] = !momentDate.isValid() ? "Invalid date" : null;
+
+    if (isStartDate && momentDate > endDate) {
+      errorMessages[name] = "Start date should not be after end date";
+    } else if (!isStartDate && momentDate < startDate) {
+      errorMessages[name] = "End date should not be before start date";
     }
 
-    setErrorMessages(prevState => ({
+    setInputErrorMessages(prevState => ({
       ...prevState,
-      ...errors
-    })); */
+      ...errorMessages
+    }));
+
+    if (errorMessages[name]) return;
+
+    dispatchDateRange({
+      type: isStartDate
+        ? DATE_RANGE_ACTIONS.SET_START_DATE
+        : DATE_RANGE_ACTIONS.SET_END_DATE,
+      payload: moment(value, "MM-DD-YYYY").toDate()
+    });
+  };
+
+  const handlePickerChange = momentDate => {
+    console.log("onChange");
 
     if (momentDate !== null) {
       dispatchDateRange({
-        type: isStartDateClick
-          ? DATE_RANGE_ACTIONS.SET_START_DATE
+        type: isPickerSettingStartDate
+          ? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
           : DATE_RANGE_ACTIONS.SET_END_DATE,
         payload: momentDate.toDate()
       });
 
+      setDateRangeInputs(prevState => ({
+        ...prevState,
+        [isPickerSettingStartDate
+          ? DATE_TYPES.START_DATE
+          : DATE_TYPES.END_DATE]: momentDate.format("MM/DD/YYYY")
+      }));
+
       if (momentDate.isValid()) {
-        setIsStartDateClick(prevState => !prevState);
+        setIsPickerSettingStartDate(prevState => !prevState);
         isYearDropdownChanged && setIsYearDropdownChanged(false);
         isMonthChanged && setIsMonthChanged(false);
       }
@@ -275,6 +329,10 @@ const DateRangePicker = ({
       type: DATE_RANGE_ACTIONS.RESET,
       payload: initialDateRange
     });
+    setDateRangeInputs({
+      startDate: moment(initialDateRange.startDate).format("MM/DD/YYYY") || "",
+      endDate: moment(initialDateRange.endDate).format("MM/DD/YYYY") || ""
+    });
     resetTrackingState();
     typeof onCancel === "function" && onCancel(startDate, endDate);
   };
@@ -285,15 +343,15 @@ const DateRangePicker = ({
   };
 
   useEffect(() => {
-    setHasErrors(
+    setDateErrors(
       !moment(startDate).isValid() ||
         !moment(endDate).isValid() ||
         endDate < startDate
     );
-    if (!hasErrors) {
-      setErrorMessages({ ...initialErrors });
+    if (!hasDateErrors) {
+      setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
     }
-  }, [startDate, endDate, hasErrors, isYearDropdownChanged]);
+  }, [startDate, endDate, hasDateErrors, isYearDropdownChanged]);
 
   return (
     <Dialog
@@ -316,80 +374,103 @@ const DateRangePicker = ({
             <Grid item xs>
               <TextField
                 label={startLabel}
-                value={null}
+                value={dateRangeInputs.startDate}
+                onChange={handleInputChange(DATE_TYPES.START_DATE)}
                 InputProps={{
                   inputComponent: renderMaskedInput
                 }}
                 variant="outlined"
                 margin="dense"
-                helperText="mm/dd/yyyy"
+                helperText={inputErrorMessages.startDate || "mm/dd/yyyy"}
+                error={Boolean(inputErrorMessages.startDate)}
                 fullWidth
               />
             </Grid>
             <Grid item xs>
-              <TextField
-                label={endLabel}
-                value={moment(endDate).format("MMM Do, YYYY")}
-                variant="outlined"
-                margin="dense"
-                helperText="mm/dd/yyyy"
-                fullWidth
-              />
+              {
+                <TextField
+                  label={endLabel}
+                  value={dateRangeInputs.endDate}
+                  onChange={handleInputChange(DATE_TYPES.END_DATE)}
+                  InputProps={{
+                    inputComponent: renderMaskedInput
+                  }}
+                  variant="outlined"
+                  margin="dense"
+                  error={Boolean(inputErrorMessages.endDate)}
+                  helperText={inputErrorMessages.endDate || "mm/dd/yyyy"}
+                  fullWidth
+                />
+              }
             </Grid>
             {
               <Grid item xs={12}>
-                <TextField
-                  label="Year"
-                  value={year}
-                  onChange={handleYearDropdownChange}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                  select
-                >
-                  {yearsList.map(year =>
-                    !isStartDateClick &&
-                    year < startDate.getFullYear() ? null : (
-                      <MenuItem key={year} value={year}>
-                        {year}
-                      </MenuItem>
-                    )
-                  )}
-                </TextField>
+                {
+                  <TextField
+                    label="Year"
+                    value={year}
+                    onChange={handleYearDropdownChange}
+                    variant="outlined"
+                    margin="dense"
+                    fullWidth
+                    select
+                  >
+                    {yearsList.map(year =>
+                      !isPickerSettingStartDate &&
+                      year < startDate.getFullYear() ? null : (
+                        <MenuItem key={year} value={year}>
+                          {year}
+                        </MenuItem>
+                      )
+                    )}
+                  </TextField>
+                }
               </Grid>
             }
           </Grid>
         }
-        <DatePicker
-          value={
-            isStartDateClick
-              ? moment(startDate)
-              : moment(endDate).isValid()
-              ? moment(endDate)
-              : moment(startDate)
-          }
-          renderDay={renderDayAsDateRange}
-          minDate={!isStartDateClick ? startDate : minDate}
-          maxDate={maxDate}
-          onChange={handleChange}
-          onAccept={_date => console.log("onAccept")}
-          onMonthChange={handleMonthChange}
-          disableToolbar
-          variant="static"
-        />
+        {
+          <DatePicker
+            value={
+              isPickerSettingStartDate
+                ? moment(startDate)
+                : moment(endDate).isValid()
+                ? moment(endDate)
+                : moment(startDate)
+            }
+            renderDay={renderDayAsDateRange}
+            minDate={!isPickerSettingStartDate ? startDate : minDate}
+            maxDate={maxDate}
+            onChange={handlePickerChange}
+            onAccept={_date => console.log("onAccept")}
+            onMonthChange={handleMonthChange}
+            disableToolbar
+            variant="static"
+          />
+        }
       </DialogContent>
       <DialogActions className={classes.dialogActions}>
-        <Button
-          color="primary"
-          variant="contained"
-          onClick={handleOkPicker}
-          disabled={hasErrors || isYearDropdownChanged}
-        >
-          Save
-        </Button>
-        <Button variant="outlined" onClick={handleCancelPicker}>
-          Cancel
-        </Button>
+        {
+          <>
+            <Button
+              color="primary"
+              variant="contained"
+              onClick={handleOkPicker}
+              disabled={
+                hasDateErrors ||
+                isYearDropdownChanged ||
+                Object.values(inputErrorMessages).find(value =>
+                  Boolean(value)
+                ) !== undefined
+              }
+            >
+              Save
+            </Button>
+            <Button variant="outlined" onClick={handleCancelPicker}>
+              Cancel
+            </Button>
+          </>
+        }
       </DialogActions>
     </Dialog>
   );
