@@ -14,7 +14,10 @@ import { makeStyles } from "@material-ui/styles";
 import classNames from "classnames";
 import moment from "moment";
 import PropTypes from "prop-types";
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useReducer, useState, useMemo } from "react";
+import createAutoCorrectedDatePipe from "text-mask-addons/dist/createAutoCorrectedDatePipe";
+import TextMaskInput from "../TextMaskInput";
+import MaskedInput from "react-text-mask";
 
 const useStyles = makeStyles(theme => ({
   day: {
@@ -118,6 +121,10 @@ const DateRangePicker = ({
     minDate.getFullYear(),
     maxDate.getFullYear()
   );
+  const autoCorrectedDatePipe = createAutoCorrectedDatePipe("mm/dd/yyyy", {
+    minYear: minDate.getFullYear(),
+    maxYear: maxDate.getFullYear()
+  });
 
   const [dateRange, dispatchDateRange] = useReducer(
     dateRangeReducer,
@@ -136,7 +143,23 @@ const DateRangePicker = ({
 
   const { startDate, endDate } = dateRange;
 
-  // let isYearChanged = false;
+  function renderMaskedInput(props) {
+    const { inputRef, ...other } = props;
+
+    return (
+      <MaskedInput
+        {...other}
+        ref={ref => {
+          inputRef(ref ? ref.inputElement : null);
+        }}
+        mask={[/\d/, /\d/, "/", /\d/, /\d/, "/", /\d/, /\d/, /\d/, /\d/]}
+        placeholderChar={"\u2000"}
+        pipe={autoCorrectedDatePipe}
+        guide
+        keepCharPositions
+      />
+    );
+  }
 
   const renderDayAsDateRange = (
     momentDate,
@@ -183,16 +206,6 @@ const DateRangePicker = ({
     setIsMonthChanged(false);
     moment(startDate).isValid() && setYear(startDate.getFullYear());
   };
-  /* const handleYearChange = momentDate => {
-    console.log("onYearChange");
-    dispatchDateRange({
-      type: isStartDateClick
-        ? DATE_RANGE_ACTIONS.SET_START_DATE
-        : DATE_RANGE_ACTIONS.SET_END_DATE,
-      payload: momentDate
-    });
-    isYearChanged = true;
-  }; */
 
   const handleYearDropdownChange = e => {
     const year = e.target.value;
@@ -219,18 +232,6 @@ const DateRangePicker = ({
   };
 
   const handleChange = momentDate => {
-    /* if (isYearChanged) {
-      console.log("isYearChanged is true, exit");
-      dispatchDateRange({
-        type: isStartDateClick
-          ? DATE_RANGE_ACTIONS.SET_START_DATE
-          : DATE_RANGE_ACTIONS.SET_END_DATE,
-        payload: null
-      });
-      isYearChanged = false;
-      return;
-    } */
-
     console.log("onChange");
     /* const errors = {};
     const key = isStartDateClick ? DATE_TYPES.START_DATE : DATE_TYPES.END_DATE;
@@ -315,7 +316,10 @@ const DateRangePicker = ({
             <Grid item xs>
               <TextField
                 label={startLabel}
-                value={moment(startDate).format("MMM Do, YYYY")}
+                value={null}
+                InputProps={{
+                  inputComponent: renderMaskedInput
+                }}
                 variant="outlined"
                 margin="dense"
                 helperText="mm/dd/yyyy"
@@ -369,7 +373,6 @@ const DateRangePicker = ({
           maxDate={maxDate}
           onChange={handleChange}
           onAccept={_date => console.log("onAccept")}
-          // onYearChange={handleYearChange}
           onMonthChange={handleMonthChange}
           disableToolbar
           variant="static"
