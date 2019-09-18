@@ -124,6 +124,7 @@ const DateRangePicker = ({
   minDate,
   maxDate,
   open,
+  dateStringFormatter,
   onAccept,
   onCancel
 }) => {
@@ -133,11 +134,11 @@ const DateRangePicker = ({
     maxDate.getFullYear()
   );
   const autoCorrectedDatePipe = useMemo(() => {
-    return createAutoCorrectedDatePipe("mm/dd/yyyy", {
+    return createAutoCorrectedDatePipe(dateStringFormatter.toLowerCase(), {
       minYear: minDate.getFullYear(),
       maxYear: maxDate.getFullYear()
     });
-  }, [minDate, maxDate]);
+  }, [dateStringFormatter, minDate, maxDate]);
   const renderMaskedInput = useCallback(
     props => {
       const { inputRef, ...other } = props;
@@ -164,8 +165,9 @@ const DateRangePicker = ({
     initialDateRange
   );
   const [dateRangeInputs, setDateRangeInputs] = useState({
-    startDate: moment(initialDateRange.startDate).format("MM/DD/YYYY") || "",
-    endDate: moment(initialDateRange.endDate).format("MM/DD/YYYY") || ""
+    startDate:
+      moment(initialDateRange.startDate).format(dateStringFormatter) || "",
+    endDate: moment(initialDateRange.endDate).format(dateStringFormatter) || ""
   });
   const [isPickerSettingStartDate, setIsPickerSettingStartDate] = useState(
     true
@@ -241,7 +243,7 @@ const DateRangePicker = ({
       ? moment(startDate)
       : moment(endDate);
     const fallbackDate = isPickerSettingStartDate
-      ? moment(`${year}-01-01`, "YYYY-MM-DD").toDate()
+      ? moment(`01/01/${year}`, "MM/DD/YYYY").toDate()
       : moment(startDate)
           .set({ year })
           .toDate();
@@ -269,12 +271,14 @@ const DateRangePicker = ({
       [name]: value
     });
 
-    errorMessages[name] = !momentDate.isValid() ? "Invalid date" : null;
+    errorMessages[name] = !momentDate.isValid()
+      ? "Please enter a valid date"
+      : null;
 
     if (isStartDate && momentDate > endDate) {
-      errorMessages[name] = "Start date should not be after end date";
+      errorMessages[name] = "Please enter a date before the end date";
     } else if (!isStartDate && momentDate < startDate) {
-      errorMessages[name] = "End date should not be before start date";
+      errorMessages[name] = "Please enter a date after the start date";
     }
 
     setInputErrorMessages(prevState => ({
@@ -288,7 +292,7 @@ const DateRangePicker = ({
       type: isStartDate
         ? DATE_RANGE_ACTIONS.SET_START_DATE
         : DATE_RANGE_ACTIONS.SET_END_DATE,
-      payload: moment(value, "MM-DD-YYYY").toDate()
+      payload: moment(value, dateStringFormatter).toDate()
     });
   };
 
@@ -307,7 +311,7 @@ const DateRangePicker = ({
         ...prevState,
         [isPickerSettingStartDate
           ? DATE_TYPES.START_DATE
-          : DATE_TYPES.END_DATE]: momentDate.format("MM/DD/YYYY")
+          : DATE_TYPES.END_DATE]: momentDate.format(dateStringFormatter)
       }));
 
       if (momentDate.isValid()) {
@@ -330,8 +334,10 @@ const DateRangePicker = ({
       payload: initialDateRange
     });
     setDateRangeInputs({
-      startDate: moment(initialDateRange.startDate).format("MM/DD/YYYY") || "",
-      endDate: moment(initialDateRange.endDate).format("MM/DD/YYYY") || ""
+      startDate:
+        moment(initialDateRange.startDate).format(dateStringFormatter) || "",
+      endDate:
+        moment(initialDateRange.endDate).format(dateStringFormatter) || ""
     });
     resetTrackingState();
     typeof onCancel === "function" && onCancel(startDate, endDate);
@@ -381,7 +387,10 @@ const DateRangePicker = ({
                 }}
                 variant="outlined"
                 margin="dense"
-                helperText={inputErrorMessages.startDate || "mm/dd/yyyy"}
+                helperText={
+                  inputErrorMessages.startDate ||
+                  dateStringFormatter.toLowerCase()
+                }
                 error={Boolean(inputErrorMessages.startDate)}
                 fullWidth
               />
@@ -398,7 +407,10 @@ const DateRangePicker = ({
                   variant="outlined"
                   margin="dense"
                   error={Boolean(inputErrorMessages.endDate)}
-                  helperText={inputErrorMessages.endDate || "mm/dd/yyyy"}
+                  helperText={
+                    inputErrorMessages.endDate ||
+                    dateStringFormatter.toLowerCase()
+                  }
                   fullWidth
                 />
               }
@@ -442,10 +454,9 @@ const DateRangePicker = ({
             minDate={!isPickerSettingStartDate ? startDate : minDate}
             maxDate={maxDate}
             onChange={handlePickerChange}
-            onAccept={_date => console.log("onAccept")}
             onMonthChange={handleMonthChange}
-            disableToolbar
             variant="static"
+            disableToolbar
           />
         }
       </DialogContent>
@@ -488,7 +499,12 @@ DateRangePicker.propTypes = {
   maxDate: PropTypes.instanceOf(Date),
   onAccept: PropTypes.func,
   onCancel: PropTypes.func,
-  open: PropTypes.bool
+  open: PropTypes.bool,
+  dateStringFormatter: PropTypes.oneOf([
+    "MM/DD/YYYY",
+    "DD/MM/YYYY",
+    "YYYY/MM/DD"
+  ])
 };
 
 DateRangePicker.defaultProps = {
@@ -503,7 +519,8 @@ DateRangePicker.defaultProps = {
   maxDate: moment("2099-12-31").toDate(),
   onAccept: null,
   onCancel: null,
-  open: false
+  open: false,
+  dateStringFormatter: "MM/DD/YYYY"
 };
 
 export default DateRangePicker;

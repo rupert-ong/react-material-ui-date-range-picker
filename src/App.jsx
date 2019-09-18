@@ -67,6 +67,7 @@ function App() {
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
+          dateStringFormatter="DD/MM/YYYY"
         />
       </MuiPickersUtilsProvider>
     </ThemeProvider>
