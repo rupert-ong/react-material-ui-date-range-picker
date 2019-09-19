@@ -66,9 +66,6 @@ const useStyles = makeStyles(theme => ({
   },
   dialogActions: {
     padding: theme.spacing(2, 3)
-  },
-  menu: {
-    height: 300
   }
 }));
 
@@ -86,7 +83,7 @@ const DATE_RANGE_ACTIONS = {
   SET_START_DATE_FOR_PICKER: "setStartDateForPicker",
   SET_START_DATE: "setStartDate",
   SET_END_DATE: "setEndDate",
-  RESET: "reset"
+  SET_BOTH: "setBoth"
 };
 
 const dateRangeReducer = (state, { type, payload }) => {
@@ -106,7 +103,7 @@ const dateRangeReducer = (state, { type, payload }) => {
         ...state,
         [DATE_TYPES.END_DATE]: payload
       };
-    case DATE_RANGE_ACTIONS.RESET:
+    case DATE_RANGE_ACTIONS.SET_BOTH:
       return { ...payload };
     default:
       throw new Error();
@@ -185,6 +182,9 @@ const DateRangePicker = ({
   const [hasDateErrors, setDateErrors] = useState(false);
 
   const { startDate, endDate } = dateRange;
+  const hasInputError =
+    Object.values(inputErrorMessages).find(value => Boolean(value)) !==
+    undefined;
 
   const renderDayAsDateRange = (
     momentDate,
@@ -205,9 +205,10 @@ const DateRangePicker = ({
       [classes.highlight]:
         dayInCurrentMonth && !isYearDropdownChanged && dayIsBetween,
       [classes.firstHighlight]:
-        (isYearChangedOnEndDateSelect && isStartDate) ||
-        (!isYearDropdownChanged && isStartDate),
-      [classes.endHighlight]: !isYearDropdownChanged && isEndDate
+        (isYearChangedOnEndDateSelect && dayInCurrentMonth && isStartDate) ||
+        (!isYearDropdownChanged && dayInCurrentMonth && isStartDate),
+      [classes.endHighlight]:
+        !isYearDropdownChanged && dayInCurrentMonth && isEndDate
     });
 
     const dayClassName = classNames(classes.day, {
@@ -255,15 +256,21 @@ const DateRangePicker = ({
         : fallbackDate
     });
 
+    setDateRangeInputs({
+      startDate: isPickerSettingStartDate ? "" : dateRangeInputs.startDate,
+      endDate: ""
+    });
+
     setYear(year);
     setIsYearDropdownChanged(true);
     console.log("handleYearListChange", year, isYearDropdownChanged);
   };
 
   const handleInputChange = name => e => {
+    console.log("handleInputChange", e.target.value);
     const { value } = e.target;
-    const errorMessages = {};
-    const momentDate = moment(value);
+    const errorMessages = { [name]: null };
+    const momentDate = moment(value, dateStringFormatter);
     const isStartDate = name === DATE_TYPES.START_DATE;
 
     setDateRangeInputs({
@@ -271,13 +278,18 @@ const DateRangePicker = ({
       [name]: value
     });
 
-    errorMessages[name] = !momentDate.isValid()
-      ? "Please enter a valid date"
-      : null;
+    errorMessages[name] =
+      !momentDate.isValid() || value.match(/\d/g).length !== 8
+        ? "Please enter a valid date"
+        : null;
 
-    if (isStartDate && momentDate > endDate) {
+    if (
+      isStartDate &&
+      moment(endDate).isValid() &&
+      momentDate.isAfter(endDate)
+    ) {
       errorMessages[name] = "Please enter a date before the end date";
-    } else if (!isStartDate && momentDate < startDate) {
+    } else if (!isStartDate && momentDate.isBefore(startDate)) {
       errorMessages[name] = "Please enter a date after the start date";
     }
 
@@ -286,13 +298,29 @@ const DateRangePicker = ({
       ...errorMessages
     }));
 
+    console.log(
+      "handleInputChange before evaluation:",
+      hasInputError,
+      inputErrorMessages,
+      errorMessages
+    );
+
     if (errorMessages[name]) return;
+
+    if (isYearDropdownChanged) setIsYearDropdownChanged(false);
+    if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
+
+    console.log(
+      "dispatching date range on input. Start date: ",
+      isStartDate,
+      momentDate.toDate()
+    );
 
     dispatchDateRange({
       type: isStartDate
         ? DATE_RANGE_ACTIONS.SET_START_DATE
         : DATE_RANGE_ACTIONS.SET_END_DATE,
-      payload: moment(value, dateStringFormatter).toDate()
+      payload: momentDate.toDate()
     });
   };
 
@@ -307,11 +335,11 @@ const DateRangePicker = ({
         payload: momentDate.toDate()
       });
 
+      const dateString = momentDate.format(dateStringFormatter);
+
       setDateRangeInputs(prevState => ({
-        ...prevState,
-        [isPickerSettingStartDate
-          ? DATE_TYPES.START_DATE
-          : DATE_TYPES.END_DATE]: momentDate.format(dateStringFormatter)
+        startDate: isPickerSettingStartDate ? dateString : prevState.startDate,
+        endDate: !isPickerSettingStartDate ? dateString : ""
       }));
 
       if (momentDate.isValid()) {
@@ -330,7 +358,7 @@ const DateRangePicker = ({
 
   const handleCancelPicker = () => {
     dispatchDateRange({
-      type: DATE_RANGE_ACTIONS.RESET,
+      type: DATE_RANGE_ACTIONS.SET_BOTH,
       payload: initialDateRange
     });
     setDateRangeInputs({
@@ -354,10 +382,44 @@ const DateRangePicker = ({
         !moment(endDate).isValid() ||
         endDate < startDate
     );
-    if (!hasDateErrors) {
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    console.log("useEffect to check inputs");
+    const momentStartDate = moment(
+      dateRangeInputs.startDate,
+      dateStringFormatter
+    );
+    const momentEndDate = moment(dateRangeInputs.endDate, dateStringFormatter);
+    const inputStartDateDigits = dateRangeInputs.startDate.match(/\d/g) || [];
+    const inputEndDateDigits = dateRangeInputs.endDate.match(/\d/g) || [];
+    const doBothDatesHaveProperLength =
+      inputStartDateDigits.length === 8 && inputEndDateDigits.length === 8;
+
+    if (
+      momentStartDate.isValid() &&
+      momentEndDate.isValid() &&
+      momentEndDate.isSameOrAfter(momentStartDate) &&
+      !hasDateErrors &&
+      doBothDatesHaveProperLength
+    ) {
       setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
+      if (isYearDropdownChanged) setIsYearDropdownChanged(false);
+      if (!momentStartDate.isSame(startDate)) {
+        dispatchDateRange({
+          type: DATE_RANGE_ACTIONS.SET_START_DATE,
+          payload: momentStartDate.toDate()
+        });
+      }
     }
-  }, [startDate, endDate, hasDateErrors, isYearDropdownChanged]);
+  }, [
+    dateRangeInputs.startDate,
+    dateRangeInputs.endDate,
+    startDate,
+    dateStringFormatter,
+    isYearDropdownChanged,
+    hasDateErrors
+  ]);
 
   return (
     <Dialog
@@ -467,13 +529,7 @@ const DateRangePicker = ({
               color="primary"
               variant="contained"
               onClick={handleOkPicker}
-              disabled={
-                hasDateErrors ||
-                isYearDropdownChanged ||
-                Object.values(inputErrorMessages).find(value =>
-                  Boolean(value)
-                ) !== undefined
-              }
+              disabled={hasDateErrors || isYearDropdownChanged || hasInputError}
             >
               Save
             </Button>
@@ -515,8 +571,8 @@ DateRangePicker.defaultProps = {
     startDate: null,
     endDate: null
   },
-  minDate: moment("1900-01-01").toDate(),
-  maxDate: moment("2099-12-31").toDate(),
+  minDate: moment("1900-01-01", "YYYY-MM-DD").toDate(),
+  maxDate: moment("2099-12-31", "YYYY-MM-DD").toDate(),
   onAccept: null,
   onCancel: null,
   open: false,
