@@ -233,7 +233,7 @@ const DateRangePicker = ({
     setIsYearDropdownChanged(false);
     setIsMonthChanged(false);
     setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
-    moment(startDate).isValid() && setYear(startDate.getFullYear());
+    if (moment(startDate).isValid()) setYear(startDate.getFullYear());
   };
 
   const handleYearDropdownChange = e => {
@@ -299,7 +299,9 @@ const DateRangePicker = ({
 
     if (errorMessagesObject[name]) return;
 
-    if (year !== momentDate.year()) setYear(momentDate.year());
+    const dateYear = momentDate.year();
+    if (year !== dateYear) setYear(dateYear);
+    if (isMonthChanged) setIsMonthChanged(false);
     if (isYearDropdownChanged) setIsYearDropdownChanged(false);
     if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
 
@@ -327,17 +329,16 @@ const DateRangePicker = ({
         endDate: !isPickerSettingStartDate ? dateString : ""
       }));
 
-      if (momentDate.isValid()) {
-        setIsPickerSettingStartDate(prevState => !prevState);
-        isYearDropdownChanged && setIsYearDropdownChanged(false);
-        isMonthChanged && setIsMonthChanged(false);
-      }
+      setIsPickerSettingStartDate(prevState => !prevState);
+      if (!isPickerSettingStartDate) setYear(startDate.getFullYear());
+      if (isYearDropdownChanged) setIsYearDropdownChanged(false);
+      if (isMonthChanged) setIsMonthChanged(false);
     }
   };
 
   const handleMonthChange = momentDate => {
     const dateYear = momentDate.year();
-    dateYear !== year && setYear(dateYear);
+    if (dateYear !== year) setYear(dateYear);
     setIsMonthChanged(true);
   };
 
@@ -353,12 +354,12 @@ const DateRangePicker = ({
         moment(initialDateRange.endDate).format(dateStringFormatter) || ""
     });
     resetTrackingState();
-    typeof onCancel === "function" && onCancel(startDate, endDate);
+    if (typeof onCancel === "function") onCancel(startDate, endDate);
   };
 
   const handleOkPicker = () => {
     resetTrackingState();
-    typeof onAccept === "function" && onAccept(startDate, endDate);
+    if (typeof onAccept === "function") onAccept(startDate, endDate);
   };
 
   useEffect(() => {
@@ -370,29 +371,36 @@ const DateRangePicker = ({
   }, [startDate, endDate]);
 
   useEffect(() => {
-    const momentStartDate = moment(
+    const momentInputStartDate = moment(
       dateRangeInputs.startDate,
       dateStringFormatter
     );
-    const momentEndDate = moment(dateRangeInputs.endDate, dateStringFormatter);
+    const momentInputEndDate = moment(
+      dateRangeInputs.endDate,
+      dateStringFormatter
+    );
     const inputStartDateDigits = dateRangeInputs.startDate.match(/\d/g) || [];
     const inputEndDateDigits = dateRangeInputs.endDate.match(/\d/g) || [];
-    const doBothDatesHaveProperLength =
+    const doBothInputDatesHaveProperLength =
       inputStartDateDigits.length === 8 && inputEndDateDigits.length === 8;
 
     if (
-      momentStartDate.isValid() &&
-      momentEndDate.isValid() &&
-      momentEndDate.isSameOrAfter(momentStartDate) &&
+      momentInputStartDate.isValid() &&
+      momentInputEndDate.isValid() &&
+      momentInputEndDate.isSameOrAfter(momentInputStartDate) &&
       !hasDateErrors &&
-      doBothDatesHaveProperLength
+      doBothInputDatesHaveProperLength
     ) {
+      const momentInputStartDateYear = momentInputStartDate.year();
       setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
+
+      if (year !== momentInputStartDateYear && !isMonthChanged)
+        setYear(momentInputStartDateYear);
       if (isYearDropdownChanged) setIsYearDropdownChanged(false);
-      if (!momentStartDate.isSame(startDate)) {
+      if (!momentInputStartDate.isSame(startDate)) {
         dispatchDateRange({
           type: DATE_RANGE_ACTIONS.SET_START_DATE,
-          payload: momentStartDate.toDate()
+          payload: momentInputStartDate.toDate()
         });
       }
     }
@@ -400,6 +408,8 @@ const DateRangePicker = ({
     dateRangeInputs.startDate,
     dateRangeInputs.endDate,
     startDate,
+    year,
+    isMonthChanged,
     dateStringFormatter,
     isYearDropdownChanged,
     hasDateErrors
