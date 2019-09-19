@@ -264,11 +264,9 @@ const DateRangePicker = ({
 
     setYear(year);
     setIsYearDropdownChanged(true);
-    console.log("handleYearListChange", year, isYearDropdownChanged);
   };
 
   const handleInputChange = name => e => {
-    console.log("handleInputChange", e.target.value);
     const { value } = e.target;
     const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
@@ -299,24 +297,11 @@ const DateRangePicker = ({
       ...errorMessagesObject
     }));
 
-    console.log(
-      "handleInputChange before evaluation:",
-      hasInputError,
-      inputErrorMessages,
-      errorMessagesObject
-    );
-
     if (errorMessagesObject[name]) return;
 
     if (year !== momentDate.year()) setYear(momentDate.year());
     if (isYearDropdownChanged) setIsYearDropdownChanged(false);
     if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
-
-    console.log(
-      "dispatching date range on input. Start date: ",
-      isStartDate,
-      momentDate.toDate()
-    );
 
     dispatchDateRange({
       type: isStartDate
@@ -327,8 +312,6 @@ const DateRangePicker = ({
   };
 
   const handlePickerChange = momentDate => {
-    console.log("onChange");
-
     if (momentDate !== null) {
       dispatchDateRange({
         type: isPickerSettingStartDate
@@ -387,7 +370,6 @@ const DateRangePicker = ({
   }, [startDate, endDate]);
 
   useEffect(() => {
-    console.log("useEffect to check inputs");
     const momentStartDate = moment(
       dateRangeInputs.startDate,
       dateStringFormatter
