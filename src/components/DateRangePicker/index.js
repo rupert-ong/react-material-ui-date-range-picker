@@ -307,6 +307,7 @@ const DateRangePicker = ({
 
     if (errorMessages[name]) return;
 
+    if (year !== momentDate.year()) setYear(momentDate.year());
     if (isYearDropdownChanged) setIsYearDropdownChanged(false);
     if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
 
