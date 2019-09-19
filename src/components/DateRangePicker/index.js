@@ -118,6 +118,7 @@ const DateRangePicker = ({
   startLabel,
   endLabel,
   initialDateRange,
+  errorMessages,
   minDate,
   maxDate,
   open,
@@ -269,7 +270,7 @@ const DateRangePicker = ({
   const handleInputChange = name => e => {
     console.log("handleInputChange", e.target.value);
     const { value } = e.target;
-    const errorMessages = { [name]: null };
+    const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
     const isStartDate = name === DATE_TYPES.START_DATE;
 
@@ -278,9 +279,9 @@ const DateRangePicker = ({
       [name]: value
     });
 
-    errorMessages[name] =
+    errorMessagesObject[name] =
       !momentDate.isValid() || value.match(/\d/g).length !== 8
-        ? "Please enter a valid date"
+        ? errorMessages.invalidDate
         : null;
 
     if (
@@ -288,24 +289,24 @@ const DateRangePicker = ({
       moment(endDate).isValid() &&
       momentDate.isAfter(endDate)
     ) {
-      errorMessages[name] = "Please enter a date before the end date";
+      errorMessagesObject[name] = errorMessages.startDateAfterEndDate;
     } else if (!isStartDate && momentDate.isBefore(startDate)) {
-      errorMessages[name] = "Please enter a date after the start date";
+      errorMessagesObject[name] = errorMessages.endDateBeforeEndDate;
     }
 
     setInputErrorMessages(prevState => ({
       ...prevState,
-      ...errorMessages
+      ...errorMessagesObject
     }));
 
     console.log(
       "handleInputChange before evaluation:",
       hasInputError,
       inputErrorMessages,
-      errorMessages
+      errorMessagesObject
     );
 
-    if (errorMessages[name]) return;
+    if (errorMessagesObject[name]) return;
 
     if (year !== momentDate.year()) setYear(momentDate.year());
     if (isYearDropdownChanged) setIsYearDropdownChanged(false);
@@ -552,6 +553,11 @@ DateRangePicker.propTypes = {
     startDate: PropTypes.instanceOf(Date),
     endDate: PropTypes.instanceOf(Date)
   }),
+  errorMessages: PropTypes.shape({
+    invalidDate: PropTypes.string,
+    startDateAfterEndDate: PropTypes.string,
+    endDateBeforeEndDate: PropTypes.string
+  }),
   minDate: PropTypes.instanceOf(Date),
   maxDate: PropTypes.instanceOf(Date),
   onAccept: PropTypes.func,
@@ -571,6 +577,11 @@ DateRangePicker.defaultProps = {
   initialDateRange: {
     startDate: null,
     endDate: null
+  },
+  errorMessages: {
+    invalidDate: "Please enter a valid date",
+    startDateAfterEndDate: "Please enter a date before the end date",
+    endDateBeforeEndDate: "Please enter a date after the start date"
   },
   minDate: moment("1900-01-01", "YYYY-MM-DD").toDate(),
   maxDate: moment("2099-12-31", "YYYY-MM-DD").toDate(),
