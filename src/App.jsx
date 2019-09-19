@@ -16,10 +16,10 @@ const theme = createMuiTheme({
 });
 
 const initialDateRange = {
-  startDate: new Date(),
-  endDate: moment(new Date())
-    .add(1, "days")
-    .toDate()
+  startDate: moment(new Date())
+    .subtract(1, "days")
+    .toDate(),
+  endDate: new Date()
 };
 
 function App() {
@@ -67,7 +67,11 @@ function App() {
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
-          dateStringFormatter="DD/MM/YYYY"
+          maxDate={initialDateRange.endDate}
+          minDate={moment(initialDateRange.endDate)
+            .subtract(2, "years")
+            .toDate()}
+          // dateStringFormatter="DD/MM/YYYY"
         />
       </MuiPickersUtilsProvider>
     </ThemeProvider>

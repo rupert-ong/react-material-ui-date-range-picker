@@ -45,6 +45,10 @@ const useStyles = makeStyles(theme => ({
     opacity: 0,
     pointerEvents: "none"
   },
+  disabledDay: {
+    color: "#ddd",
+    pointerEvents: "none"
+  },
   highlight: {
     background: theme.palette.primary.main,
     color: theme.palette.common.white
@@ -201,6 +205,8 @@ const DateRangePicker = ({
       isYearDropdownChanged &&
       (moment(startDate).isSame(endDate) ||
         (isMonthChanged && !isPickerSettingStartDate));
+    const isDayOutsideMinAndMax =
+      momentDate.isBefore(minDate, "day") || momentDate.isAfter(maxDate, "day");
 
     const wrapperClassName = classNames({
       [classes.highlight]:
@@ -209,7 +215,8 @@ const DateRangePicker = ({
         (isYearChangedOnEndDateSelect && dayInCurrentMonth && isStartDate) ||
         (!isYearDropdownChanged && dayInCurrentMonth && isStartDate),
       [classes.endHighlight]:
-        !isYearDropdownChanged && dayInCurrentMonth && isEndDate
+        !isYearDropdownChanged && dayInCurrentMonth && isEndDate,
+      [classes.disabledDay]: isDayOutsideMinAndMax
     });
 
     const dayClassName = classNames(classes.day, {
@@ -237,7 +244,7 @@ const DateRangePicker = ({
   };
 
   const handleYearDropdownChange = e => {
-    const year = e.target.value;
+    const yearValue = e.target.value;
     const actionType = isPickerSettingStartDate
       ? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
       : DATE_RANGE_ACTIONS.SET_END_DATE;
@@ -245,15 +252,22 @@ const DateRangePicker = ({
       ? moment(startDate)
       : moment(endDate);
     const fallbackDate = isPickerSettingStartDate
-      ? moment(`01/01/${year}`, "MM/DD/YYYY").toDate()
-      : moment(startDate)
-          .set({ year })
+      ? moment(`01/01/${yearValue}`, "MM/DD/YYYY").toDate()
+      : moment(startDate <= minDate ? startDate : minDate)
+          .set({ year: yearValue })
           .toDate();
+
+    console.log(
+      "handleYearChange: isStartDate:",
+      isPickerSettingStartDate,
+      momentDate,
+      fallbackDate
+    );
 
     dispatchDateRange({
       type: actionType,
       payload: momentDate.isValid()
-        ? momentDate.set({ year }).toDate()
+        ? momentDate.set({ year: yearValue }).toDate()
         : fallbackDate
     });
 
@@ -262,7 +276,7 @@ const DateRangePicker = ({
       endDate: ""
     });
 
-    setYear(year);
+    setYear(yearValue);
     setIsYearDropdownChanged(true);
   };
 
@@ -285,10 +299,10 @@ const DateRangePicker = ({
     if (
       isStartDate &&
       moment(endDate).isValid() &&
-      momentDate.isAfter(endDate)
+      momentDate.isAfter(endDate, "day")
     ) {
       errorMessagesObject[name] = errorMessages.startDateAfterEndDate;
-    } else if (!isStartDate && momentDate.isBefore(startDate)) {
+    } else if (!isStartDate && momentDate.isBefore(startDate, "day")) {
       errorMessagesObject[name] = errorMessages.endDateBeforeEndDate;
     }
 
@@ -483,11 +497,11 @@ const DateRangePicker = ({
                     fullWidth
                     select
                   >
-                    {yearsList.map(year =>
+                    {yearsList.map(yearValue =>
                       !isPickerSettingStartDate &&
-                      year < startDate.getFullYear() ? null : (
-                        <MenuItem key={year} value={year}>
-                          {year}
+                      yearValue < startDate.getFullYear() ? null : (
+                        <MenuItem key={yearValue} value={yearValue}>
+                          {yearValue}
                         </MenuItem>
                       )
                     )}
@@ -500,11 +514,14 @@ const DateRangePicker = ({
         {
           <DatePicker
             value={
-              isPickerSettingStartDate
+              /*  isPickerSettingStartDate
                 ? moment(startDate)
                 : moment(endDate).isValid()
                 ? moment(endDate)
-                : moment(startDate)
+                : moment(startDate) */
+              isPickerSettingStartDate || !moment(endDate).isValid()
+                ? moment(startDate)
+                : moment(endDate)
             }
             renderDay={renderDayAsDateRange}
             minDate={!isPickerSettingStartDate ? startDate : minDate}
