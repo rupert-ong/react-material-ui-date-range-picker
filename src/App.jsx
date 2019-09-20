@@ -1,19 +1,12 @@
 import MomentUtils from "@date-io/moment";
 import { Box, Button, Typography } from "@material-ui/core";
 import CssBaseline from "@material-ui/core/CssBaseline";
-import { createMuiTheme } from "@material-ui/core/styles";
 import { MuiPickersUtilsProvider } from "@material-ui/pickers";
 import { ThemeProvider } from "@material-ui/styles";
 import React, { useState } from "react";
 import moment from "moment";
 import DateRangePicker from "./components/DateRangePicker";
-import overrides from "./theme/overrides";
-import palette from "./theme/palette";
-
-const theme = createMuiTheme({
-  palette,
-  overrides
-});
+import theme from "./theme/index";
 
 const initialDateRange = {
   startDate: moment(new Date())

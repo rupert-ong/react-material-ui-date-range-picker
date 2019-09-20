@@ -46,7 +46,7 @@ const useStyles = makeStyles(theme => ({
     pointerEvents: "none"
   },
   disabledDay: {
-    color: "#ddd",
+    color: theme.palette.text.disabled,
     pointerEvents: "none"
   },
   highlight: {
