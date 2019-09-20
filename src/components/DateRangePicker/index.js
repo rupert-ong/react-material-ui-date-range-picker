@@ -370,9 +370,13 @@ const DateRangePicker = ({
     });
     setDateRangeInputs({
       startDate:
-        moment(initialDateRange.startDate).format(dateStringFormatter) || "",
+        (moment(initialDateRange.startDate).isValid() &&
+          moment(initialDateRange.startDate).format(dateStringFormatter)) ||
+        "",
       endDate:
-        moment(initialDateRange.endDate).format(dateStringFormatter) || ""
+        (moment(initialDateRange.endDate).isValid() &&
+          moment(initialDateRange.endDate).format(dateStringFormatter)) ||
+        ""
     });
     resetTrackingState();
     if (typeof onCancel === "function") onCancel(startDate, endDate);

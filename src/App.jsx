@@ -56,7 +56,7 @@ function App() {
         </Box>
         <DateRangePicker
           title="Change date"
-          initialDateRange={dateRange}
+          // initialDateRange={dateRange}
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
