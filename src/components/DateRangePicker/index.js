@@ -281,10 +281,17 @@ const DateRangePicker = ({
   };
 
   const handleInputChange = name => e => {
+    console.log(
+      "handleInputChange - isStartDate: ",
+      name === DATE_TYPES.START_DATE,
+      e.target.value
+    );
     const { value } = e.target;
     const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
     const isStartDate = name === DATE_TYPES.START_DATE;
+    const isDateValidAndWithinRange =
+      momentDate.isValid() && momentDate.isBetween(minDate, maxDate, "day", []);
 
     setDateRangeInputs({
       ...dateRangeInputs,
@@ -292,7 +299,7 @@ const DateRangePicker = ({
     });
 
     errorMessagesObject[name] =
-      !momentDate.isValid() || value.match(/\d/g).length !== 8
+      !isDateValidAndWithinRange || value.match(/\d/g).length !== 8
         ? errorMessages.invalidDate
         : null;
 
@@ -400,7 +407,9 @@ const DateRangePicker = ({
 
     if (
       momentInputStartDate.isValid() &&
+      momentInputStartDate.isSameOrAfter(minDate, "day") &&
       momentInputEndDate.isValid() &&
+      momentInputEndDate.isSameOrBefore(maxDate, "day") &&
       momentInputEndDate.isSameOrAfter(momentInputStartDate) &&
       !hasDateErrors &&
       doBothInputDatesHaveProperLength
@@ -417,11 +426,18 @@ const DateRangePicker = ({
           payload: momentInputStartDate.toDate()
         });
       }
+      if (!momentInputEndDate.isSame(endDate)) {
+        dispatchDateRange({
+          type: DATE_RANGE_ACTIONS.SET_END_DATE,
+          payload: momentInputEndDate.toDate()
+        });
+      }
     }
   }, [
     dateRangeInputs.startDate,
     dateRangeInputs.endDate,
     startDate,
+    endDate,
     year,
     isMonthChanged,
     dateStringFormatter,
