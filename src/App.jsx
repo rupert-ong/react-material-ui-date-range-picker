@@ -56,12 +56,12 @@ function App() {
         </Box>
         <DateRangePicker
           title="Change date"
-          // initialDateRange={dateRange}
+          initialDateRange={dateRange}
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
           maxDate={initialDateRange.endDate}
-          minDate={moment(initialDateRange.endDate)
+          minDate={moment(initialDateRange.startDate)
             .subtract(2, "years")
             .toDate()}
           // dateStringFormatter="DD/MM/YYYY"

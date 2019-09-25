@@ -135,11 +135,14 @@ const DateRangePicker = ({
     minDate.getFullYear(),
     maxDate.getFullYear()
   );
+  let timerId;
   const autoCorrectedDatePipe = useMemo(() => {
-    return createAutoCorrectedDatePipe(dateStringFormatter.toLowerCase(), {
+    return createAutoCorrectedDatePipe(
+      dateStringFormatter.toLowerCase() /* , {
       minYear: minDate.getFullYear(),
       maxYear: maxDate.getFullYear()
-    });
+    } */
+    );
   }, [dateStringFormatter, minDate, maxDate]);
   const renderMaskedInput = useCallback(
     props => {
@@ -206,7 +209,10 @@ const DateRangePicker = ({
       (moment(startDate).isSame(endDate) ||
         (isMonthChanged && !isPickerSettingStartDate));
     const isDayOutsideMinAndMax =
-      momentDate.isBefore(minDate, "day") || momentDate.isAfter(maxDate, "day");
+      momentDate.isBefore(minDate, "day") ||
+      momentDate.isAfter(maxDate, "day") ||
+      (isPickerSettingStartDate && momentDate.isAfter(endDate, "day")) ||
+      (!isPickerSettingStartDate && momentDate.isBefore(startDate, "day"));
 
     const wrapperClassName = classNames({
       [classes.highlight]:
@@ -251,15 +257,25 @@ const DateRangePicker = ({
     const momentDate = isPickerSettingStartDate
       ? moment(startDate)
       : moment(endDate);
-    const fallbackDate = isPickerSettingStartDate
+    let fallbackDate = isPickerSettingStartDate
       ? moment(`01/01/${yearValue}`, "MM/DD/YYYY").toDate()
-      : moment(startDate <= minDate ? startDate : minDate)
+      : moment(startDate <= minDate ? minDate : startDate)
           .set({ year: yearValue })
           .toDate();
+    if (moment(fallbackDate).isAfter(maxDate, "day"))
+      fallbackDate = moment(maxDate)
+        .set({ year: yearValue })
+        .toDate();
 
     console.log(
       "handleYearChange: isStartDate:",
       isPickerSettingStartDate,
+      "startDate:",
+      startDate,
+      "minDate:",
+      minDate,
+      "start date is less than min date:",
+      startDate <= minDate,
       momentDate,
       fallbackDate
     );
@@ -334,11 +350,29 @@ const DateRangePicker = ({
     });
   };
 
+  const handleInputFocus = name => e => {
+    const isStartDate = name === DATE_TYPES.START_DATE;
+    clearTimeout(timerId);
+
+    if (isStartDate) {
+      setIsPickerSettingStartDate(true);
+    } else {
+      setIsPickerSettingStartDate(false);
+    }
+  };
+
+  const handleInputBlur = name => e => {
+    timerId = setTimeout(() => {
+      setIsPickerSettingStartDate(true);
+    }, 250);
+  };
+
   const handlePickerChange = momentDate => {
     if (momentDate !== null) {
       dispatchDateRange({
         type: isPickerSettingStartDate
-          ? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
+          ? //? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
+            DATE_RANGE_ACTIONS.SET_START_DATE
           : DATE_RANGE_ACTIONS.SET_END_DATE,
         payload: momentDate.toDate()
       });
@@ -347,7 +381,8 @@ const DateRangePicker = ({
 
       setDateRangeInputs(prevState => ({
         startDate: isPickerSettingStartDate ? dateString : prevState.startDate,
-        endDate: !isPickerSettingStartDate ? dateString : ""
+        // endDate: !isPickerSettingStartDate ? dateString : ""
+        endDate: !isPickerSettingStartDate ? dateString : prevState.endDate
       }));
 
       setIsPickerSettingStartDate(prevState => !prevState);
@@ -369,14 +404,8 @@ const DateRangePicker = ({
       payload: initialDateRange
     });
     setDateRangeInputs({
-      startDate:
-        (moment(initialDateRange.startDate).isValid() &&
-          moment(initialDateRange.startDate).format(dateStringFormatter)) ||
-        "",
-      endDate:
-        (moment(initialDateRange.endDate).isValid() &&
-          moment(initialDateRange.endDate).format(dateStringFormatter)) ||
-        ""
+      startDate: moment(initialDateRange.startDate).format(dateStringFormatter),
+      endDate: moment(initialDateRange.endDate).format(dateStringFormatter)
     });
     resetTrackingState();
     if (typeof onCancel === "function") onCancel(startDate, endDate);
@@ -440,6 +469,8 @@ const DateRangePicker = ({
   }, [
     dateRangeInputs.startDate,
     dateRangeInputs.endDate,
+    minDate,
+    maxDate,
     startDate,
     endDate,
     year,
@@ -471,7 +502,9 @@ const DateRangePicker = ({
               <TextField
                 label={startLabel}
                 value={dateRangeInputs.startDate}
+                onFocus={handleInputFocus(DATE_TYPES.START_DATE)}
                 onChange={handleInputChange(DATE_TYPES.START_DATE)}
+                onBlur={handleInputBlur(DATE_TYPES.START_DATE)}
                 InputProps={{
                   inputComponent: renderMaskedInput
                 }}
@@ -490,7 +523,9 @@ const DateRangePicker = ({
                 <TextField
                   label={endLabel}
                   value={dateRangeInputs.endDate}
+                  onFocus={handleInputFocus(DATE_TYPES.END_DATE)}
                   onChange={handleInputChange(DATE_TYPES.END_DATE)}
+                  onBlur={handleInputBlur(DATE_TYPES.END_DATE)}
                   InputProps={{
                     inputComponent: renderMaskedInput
                   }}
