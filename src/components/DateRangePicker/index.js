@@ -78,6 +78,11 @@ const INITIAL_ERROR_MESSAGES_STATE = {
   endDate: null
 };
 
+const INITIAL_INPUTS_TOUCHED_STATE = {
+  startDate: false,
+  endDate: false
+};
+
 const DATE_TYPES = {
   START_DATE: "startDate",
   END_DATE: "endDate"
@@ -186,6 +191,9 @@ const DateRangePicker = ({
   const [isMonthChanged, setIsMonthChanged] = useState(false);
   const [inputErrorMessages, setInputErrorMessages] = useState(
     INITIAL_ERROR_MESSAGES_STATE
+  );
+  const [inputsTouched, setInputsTouched] = useState(
+    INITIAL_INPUTS_TOUCHED_STATE
   );
   const [hasDateErrors, setDateErrors] = useState(false);
 
@@ -365,6 +373,10 @@ const DateRangePicker = ({
     timerId = setTimeout(() => {
       setIsPickerSettingStartDate(true);
     }, 250);
+    setInputsTouched(prevState => ({
+      ...prevState,
+      [name]: true
+    }));
   };
 
   const handlePickerChange = momentDate => {
@@ -511,10 +523,13 @@ const DateRangePicker = ({
                 variant="outlined"
                 margin="dense"
                 helperText={
-                  inputErrorMessages.startDate ||
-                  dateStringFormatter.toLowerCase()
+                  inputErrorMessages.startDate && inputsTouched.startDate
+                    ? inputErrorMessages.startDate
+                    : dateStringFormatter.toLowerCase()
                 }
-                error={Boolean(inputErrorMessages.startDate)}
+                error={Boolean(
+                  inputsTouched.startDate && inputErrorMessages.startDate
+                )}
                 fullWidth
               />
             </Grid>
@@ -531,10 +546,13 @@ const DateRangePicker = ({
                   }}
                   variant="outlined"
                   margin="dense"
-                  error={Boolean(inputErrorMessages.endDate)}
+                  error={Boolean(
+                    inputsTouched.endDate && inputErrorMessages.endDate
+                  )}
                   helperText={
-                    inputErrorMessages.endDate ||
-                    dateStringFormatter.toLowerCase()
+                    inputErrorMessages.endDate && inputsTouched.endDate
+                      ? inputErrorMessages.endDate
+                      : dateStringFormatter.toLowerCase()
                   }
                   fullWidth
                 />
