@@ -370,9 +370,13 @@ const DateRangePicker = ({
   };
 
   const handleInputBlur = name => e => {
-    timerId = setTimeout(() => {
-      setIsPickerSettingStartDate(true);
-    }, 250);
+    const isStartDate = name === DATE_TYPES.START_DATE;
+
+    if (!isStartDate) {
+      timerId = setTimeout(() => {
+        setIsPickerSettingStartDate(true);
+      }, 500);
+    }
     setInputsTouched(prevState => ({
       ...prevState,
       [name]: true
