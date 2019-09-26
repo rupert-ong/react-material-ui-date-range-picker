@@ -142,13 +142,8 @@ const DateRangePicker = ({
   );
   let timerId;
   const autoCorrectedDatePipe = useMemo(() => {
-    return createAutoCorrectedDatePipe(
-      dateStringFormatter.toLowerCase() /* , {
-      minYear: minDate.getFullYear(),
-      maxYear: maxDate.getFullYear()
-    } */
-    );
-  }, [dateStringFormatter, minDate, maxDate]);
+    return createAutoCorrectedDatePipe(dateStringFormatter.toLowerCase());
+  }, [dateStringFormatter]);
   const renderMaskedInput = useCallback(
     props => {
       const { inputRef, ...other } = props;
@@ -179,6 +174,11 @@ const DateRangePicker = ({
       moment(initialDateRange.startDate).format(dateStringFormatter) || "",
     endDate: moment(initialDateRange.endDate).format(dateStringFormatter) || ""
   });
+  const [pickerDate, setPickerDate] = useState(
+    moment(initialDateRange.startDate).isValid()
+      ? initialDateRange.startDate
+      : null
+  );
   const [isPickerSettingStartDate, setIsPickerSettingStartDate] = useState(
     true
   );
@@ -224,10 +224,11 @@ const DateRangePicker = ({
 
     const wrapperClassName = classNames({
       [classes.highlight]:
-        dayInCurrentMonth && !isYearDropdownChanged && dayIsBetween,
+        dayInCurrentMonth && /*!isYearDropdownChanged && */ dayIsBetween,
       [classes.firstHighlight]:
-        (isYearChangedOnEndDateSelect && dayInCurrentMonth && isStartDate) ||
-        (!isYearDropdownChanged && dayInCurrentMonth && isStartDate),
+        /*  (isYearChangedOnEndDateSelect && dayInCurrentMonth && isStartDate) ||
+        (!isYearDropdownChanged && dayInCurrentMonth && isStartDate) */ dayInCurrentMonth &&
+        isStartDate,
       [classes.endHighlight]:
         !isYearDropdownChanged && dayInCurrentMonth && isEndDate,
       [classes.disabledDay]: isDayOutsideMinAndMax
@@ -254,7 +255,10 @@ const DateRangePicker = ({
     setIsYearDropdownChanged(false);
     setIsMonthChanged(false);
     setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
-    if (moment(startDate).isValid()) setYear(startDate.getFullYear());
+    if (moment(startDate).isValid()) {
+      setPickerDate(startDate);
+      setYear(startDate.getFullYear());
+    }
   };
 
   const handleYearDropdownChange = e => {
@@ -275,30 +279,11 @@ const DateRangePicker = ({
         .set({ year: yearValue })
         .toDate();
 
-    console.log(
-      "handleYearChange: isStartDate:",
-      isPickerSettingStartDate,
-      "startDate:",
-      startDate,
-      "minDate:",
-      minDate,
-      "start date is less than min date:",
-      startDate <= minDate,
-      momentDate,
-      fallbackDate
-    );
-
-    dispatchDateRange({
-      type: actionType,
-      payload: momentDate.isValid()
+    setPickerDate(
+      momentDate.isValid()
         ? momentDate.set({ year: yearValue }).toDate()
         : fallbackDate
-    });
-
-    setDateRangeInputs({
-      startDate: isPickerSettingStartDate ? "" : dateRangeInputs.startDate,
-      endDate: ""
-    });
+    );
 
     setYear(yearValue);
     setIsYearDropdownChanged(true);
@@ -314,8 +299,12 @@ const DateRangePicker = ({
     const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
     const isStartDate = name === DATE_TYPES.START_DATE;
-    const isDateValidAndWithinRange =
-      momentDate.isValid() && momentDate.isBetween(minDate, maxDate, "day", []);
+    const isDateWithinMinMaxDateRange = momentDate.isBetween(
+      minDate,
+      maxDate,
+      "day",
+      []
+    );
 
     setDateRangeInputs({
       ...dateRangeInputs,
@@ -323,9 +312,15 @@ const DateRangePicker = ({
     });
 
     errorMessagesObject[name] =
-      !isDateValidAndWithinRange || value.match(/\d/g).length !== 8
+      !momentDate.isValid() || value.match(/\d/g).length !== 8
         ? errorMessages.invalidDate
         : null;
+
+    if (!isDateWithinMinMaxDateRange) {
+      errorMessagesObject[name] = isStartDate
+        ? errorMessages.startDateBeforeMinDate
+        : errorMessages.endDateAfterMaxDate;
+    }
 
     if (
       isStartDate &&
@@ -348,7 +343,7 @@ const DateRangePicker = ({
     if (year !== dateYear) setYear(dateYear);
     if (isMonthChanged) setIsMonthChanged(false);
     if (isYearDropdownChanged) setIsYearDropdownChanged(false);
-    if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
+    // if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
 
     dispatchDateRange({
       type: isStartDate
@@ -356,17 +351,17 @@ const DateRangePicker = ({
         : DATE_RANGE_ACTIONS.SET_END_DATE,
       payload: momentDate.toDate()
     });
+    setPickerDate(momentDate.toDate());
   };
 
   const handleInputFocus = name => e => {
     const isStartDate = name === DATE_TYPES.START_DATE;
     clearTimeout(timerId);
 
-    if (isStartDate) {
-      setIsPickerSettingStartDate(true);
-    } else {
-      setIsPickerSettingStartDate(false);
-    }
+    setIsPickerSettingStartDate(isStartDate ? true : false);
+    setPickerDate(dateRange[name]);
+    if (year !== dateRange[name].getFullYear())
+      setYear(dateRange[name].getFullYear());
   };
 
   const handleInputBlur = name => e => {
@@ -375,7 +370,7 @@ const DateRangePicker = ({
     if (!isStartDate) {
       timerId = setTimeout(() => {
         setIsPickerSettingStartDate(true);
-      }, 500);
+      }, 250);
     }
     setInputsTouched(prevState => ({
       ...prevState,
@@ -392,6 +387,8 @@ const DateRangePicker = ({
           : DATE_RANGE_ACTIONS.SET_END_DATE,
         payload: momentDate.toDate()
       });
+
+      setPickerDate(momentDate.toDate());
 
       const dateString = momentDate.format(dateStringFormatter);
 
@@ -463,11 +460,11 @@ const DateRangePicker = ({
       !hasDateErrors &&
       doBothInputDatesHaveProperLength
     ) {
-      const momentInputStartDateYear = momentInputStartDate.year();
+      // const momentInputStartDateYear = momentInputStartDate.year();
       setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
 
-      if (year !== momentInputStartDateYear && !isMonthChanged)
-        setYear(momentInputStartDateYear);
+      /* if (year !== momentInputStartDateYear && !isMonthChanged)
+        setYear(momentInputStartDateYear); */
       if (isYearDropdownChanged) setIsYearDropdownChanged(false);
       if (!momentInputStartDate.isSame(startDate)) {
         dispatchDateRange({
@@ -574,14 +571,15 @@ const DateRangePicker = ({
                     fullWidth
                     select
                   >
-                    {yearsList.map(yearValue =>
-                      !isPickerSettingStartDate &&
-                      yearValue < startDate.getFullYear() ? null : (
-                        <MenuItem key={yearValue} value={yearValue}>
-                          {yearValue}
-                        </MenuItem>
-                      )
-                    )}
+                    {yearsList.map(yearValue => (
+                      /* !isPickerSettingStartDate &&
+                      yearValue < startDate.getFullYear() ? null : */ <MenuItem
+                        key={yearValue}
+                        value={yearValue}
+                      >
+                        {yearValue}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 }
               </Grid>
@@ -596,9 +594,10 @@ const DateRangePicker = ({
                 : moment(endDate).isValid()
                 ? moment(endDate)
                 : moment(startDate) */
-              isPickerSettingStartDate || !moment(endDate).isValid()
+              /* isPickerSettingStartDate || !moment(endDate).isValid()
                 ? moment(startDate)
-                : moment(endDate)
+                : moment(endDate) */
+              pickerDate
             }
             renderDay={renderDayAsDateRange}
             minDate={!isPickerSettingStartDate ? startDate : minDate}
@@ -617,7 +616,7 @@ const DateRangePicker = ({
               color="primary"
               variant="contained"
               onClick={handleOkPicker}
-              disabled={hasDateErrors || isYearDropdownChanged || hasInputError}
+              disabled={hasDateErrors || hasInputError}
             >
               Save
             </Button>
@@ -667,7 +666,10 @@ DateRangePicker.defaultProps = {
   errorMessages: {
     invalidDate: "Please enter a valid date",
     startDateAfterEndDate: "Please enter a date before the end date",
-    endDateBeforeEndDate: "Please enter a date after the start date"
+    endDateBeforeEndDate: "Please enter a date after the start date",
+    startDateBeforeMinDate:
+      "Please enter a date after the minimum date allowed",
+    endDateAfterMaxDate: "Please enter a date before the maximum date allowed"
   },
   minDate: moment("1900-01-01", "YYYY-MM-DD").toDate(),
   maxDate: moment("2099-12-31", "YYYY-MM-DD").toDate(),
