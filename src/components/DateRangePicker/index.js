@@ -89,7 +89,6 @@ const DATE_TYPES = {
 };
 
 const DATE_RANGE_ACTIONS = {
-  SET_START_DATE_FOR_PICKER: "setStartDateForPicker",
   SET_START_DATE: "setStartDate",
   SET_END_DATE: "setEndDate",
   SET_BOTH: "setBoth"
@@ -97,11 +96,6 @@ const DATE_RANGE_ACTIONS = {
 
 const dateRangeReducer = (state, { type, payload }) => {
   switch (type) {
-    case DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER:
-      return {
-        [DATE_TYPES.START_DATE]: payload,
-        [DATE_TYPES.END_DATE]: null
-      };
     case DATE_RANGE_ACTIONS.SET_START_DATE:
       return {
         ...state,
@@ -187,8 +181,6 @@ const DateRangePicker = ({
       ? moment(dateRange.startDate).year()
       : minDate.getFullYear()
   );
-  const [isYearDropdownChanged, setIsYearDropdownChanged] = useState(false);
-  const [isMonthChanged, setIsMonthChanged] = useState(false);
   const [inputErrorMessages, setInputErrorMessages] = useState(
     INITIAL_ERROR_MESSAGES_STATE
   );
@@ -207,30 +199,23 @@ const DateRangePicker = ({
     _selectedDate,
     dayInCurrentMonth
   ) => {
-    const dayIsBetween = momentDate.isBetween(startDate, endDate);
+    const dayIsBetween = momentDate.isBetween(startDate, endDate, "day");
     const isBeforeStartDateOnEndDateSelection =
       momentDate.isBefore(startDate, "day") && !isPickerSettingStartDate;
     const isStartDate = momentDate.isSame(startDate, "day");
     const isEndDate = momentDate.isSame(endDate, "day");
-    const isYearChangedOnEndDateSelect =
-      isYearDropdownChanged &&
-      (moment(startDate).isSame(endDate) ||
-        (isMonthChanged && !isPickerSettingStartDate));
     const isDayOutsideMinAndMax =
       momentDate.isBefore(minDate, "day") ||
       momentDate.isAfter(maxDate, "day") ||
-      (isPickerSettingStartDate && momentDate.isAfter(endDate, "day")) ||
       (!isPickerSettingStartDate && momentDate.isBefore(startDate, "day"));
 
     const wrapperClassName = classNames({
-      [classes.highlight]:
-        dayInCurrentMonth && /*!isYearDropdownChanged && */ dayIsBetween,
+      [classes.highlight]: dayInCurrentMonth && dayIsBetween,
       [classes.firstHighlight]:
-        /*  (isYearChangedOnEndDateSelect && dayInCurrentMonth && isStartDate) ||
-        (!isYearDropdownChanged && dayInCurrentMonth && isStartDate) */ dayInCurrentMonth &&
-        isStartDate,
+        (dayInCurrentMonth && isStartDate) ||
+        (dayInCurrentMonth && isStartDate),
       [classes.endHighlight]:
-        !isYearDropdownChanged && dayInCurrentMonth && isEndDate,
+        dayInCurrentMonth && isEndDate && momentDate.isAfter(startDate, "day"),
       [classes.disabledDay]: isDayOutsideMinAndMax
     });
 
@@ -252,8 +237,6 @@ const DateRangePicker = ({
 
   const resetTrackingState = () => {
     setIsPickerSettingStartDate(true);
-    setIsYearDropdownChanged(false);
-    setIsMonthChanged(false);
     setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
     if (moment(startDate).isValid()) {
       setPickerDate(startDate);
@@ -263,15 +246,22 @@ const DateRangePicker = ({
 
   const handleYearDropdownChange = e => {
     const yearValue = e.target.value;
-    const actionType = isPickerSettingStartDate
-      ? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
-      : DATE_RANGE_ACTIONS.SET_END_DATE;
     const momentDate = isPickerSettingStartDate
-      ? moment(startDate)
-      : moment(endDate);
-    let fallbackDate = isPickerSettingStartDate
+      ? moment(startDate).set({ year: yearValue })
+      : moment(endDate).set({ year: yearValue });
+    let newPickerDate = momentDate.toDate();
+
+    if (momentDate.isAfter(maxDate, "day")) {
+      newPickerDate = maxDate;
+    } else if (momentDate.isBefore(minDate, "day")) {
+      newPickerDate = minDate;
+    }
+
+    setPickerDate(newPickerDate);
+
+    /*  let fallbackDate = isPickerSettingStartDate
       ? moment(`01/01/${yearValue}`, "MM/DD/YYYY").toDate()
-      : moment(startDate <= minDate ? minDate : startDate)
+      : moment(startDate > minDate ? minDate : startDate)
           .set({ year: yearValue })
           .toDate();
     if (moment(fallbackDate).isAfter(maxDate, "day"))
@@ -283,18 +273,12 @@ const DateRangePicker = ({
       momentDate.isValid()
         ? momentDate.set({ year: yearValue }).toDate()
         : fallbackDate
-    );
+    );*/
 
     setYear(yearValue);
-    setIsYearDropdownChanged(true);
   };
 
   const handleInputChange = name => e => {
-    console.log(
-      "handleInputChange - isStartDate: ",
-      name === DATE_TYPES.START_DATE,
-      e.target.value
-    );
     const { value } = e.target;
     const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
@@ -341,9 +325,6 @@ const DateRangePicker = ({
 
     const dateYear = momentDate.year();
     if (year !== dateYear) setYear(dateYear);
-    if (isMonthChanged) setIsMonthChanged(false);
-    if (isYearDropdownChanged) setIsYearDropdownChanged(false);
-    // if (!isPickerSettingStartDate) setIsPickerSettingStartDate(true);
 
     dispatchDateRange({
       type: isStartDate
@@ -382,8 +363,7 @@ const DateRangePicker = ({
     if (momentDate !== null) {
       dispatchDateRange({
         type: isPickerSettingStartDate
-          ? //? DATE_RANGE_ACTIONS.SET_START_DATE_FOR_PICKER
-            DATE_RANGE_ACTIONS.SET_START_DATE
+          ? DATE_RANGE_ACTIONS.SET_START_DATE
           : DATE_RANGE_ACTIONS.SET_END_DATE,
         payload: momentDate.toDate()
       });
@@ -394,21 +374,16 @@ const DateRangePicker = ({
 
       setDateRangeInputs(prevState => ({
         startDate: isPickerSettingStartDate ? dateString : prevState.startDate,
-        // endDate: !isPickerSettingStartDate ? dateString : ""
         endDate: !isPickerSettingStartDate ? dateString : prevState.endDate
       }));
 
       setIsPickerSettingStartDate(prevState => !prevState);
-      if (!isPickerSettingStartDate) setYear(startDate.getFullYear());
-      if (isYearDropdownChanged) setIsYearDropdownChanged(false);
-      if (isMonthChanged) setIsMonthChanged(false);
     }
   };
 
   const handleMonthChange = momentDate => {
     const dateYear = momentDate.year();
     if (dateYear !== year) setYear(dateYear);
-    setIsMonthChanged(true);
   };
 
   const handleCancelPicker = () => {
@@ -460,12 +435,8 @@ const DateRangePicker = ({
       !hasDateErrors &&
       doBothInputDatesHaveProperLength
     ) {
-      // const momentInputStartDateYear = momentInputStartDate.year();
       setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
 
-      /* if (year !== momentInputStartDateYear && !isMonthChanged)
-        setYear(momentInputStartDateYear); */
-      if (isYearDropdownChanged) setIsYearDropdownChanged(false);
       if (!momentInputStartDate.isSame(startDate)) {
         dispatchDateRange({
           type: DATE_RANGE_ACTIONS.SET_START_DATE,
@@ -486,10 +457,7 @@ const DateRangePicker = ({
     maxDate,
     startDate,
     endDate,
-    year,
-    isMonthChanged,
     dateStringFormatter,
-    isYearDropdownChanged,
     hasDateErrors
   ]);
 
@@ -572,11 +540,7 @@ const DateRangePicker = ({
                     select
                   >
                     {yearsList.map(yearValue => (
-                      /* !isPickerSettingStartDate &&
-                      yearValue < startDate.getFullYear() ? null : */ <MenuItem
-                        key={yearValue}
-                        value={yearValue}
-                      >
+                      <MenuItem key={yearValue} value={yearValue}>
                         {yearValue}
                       </MenuItem>
                     ))}
@@ -588,17 +552,7 @@ const DateRangePicker = ({
         }
         {
           <DatePicker
-            value={
-              /*  isPickerSettingStartDate
-                ? moment(startDate)
-                : moment(endDate).isValid()
-                ? moment(endDate)
-                : moment(startDate) */
-              /* isPickerSettingStartDate || !moment(endDate).isValid()
-                ? moment(startDate)
-                : moment(endDate) */
-              pickerDate
-            }
+            value={pickerDate}
             renderDay={renderDayAsDateRange}
             minDate={!isPickerSettingStartDate ? startDate : minDate}
             maxDate={maxDate}

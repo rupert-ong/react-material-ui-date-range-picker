@@ -60,7 +60,9 @@ function App() {
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
-          maxDate={initialDateRange.endDate}
+          maxDate={moment(initialDateRange.endDate)
+            .add(2, "years")
+            .toDate()}
           minDate={moment(initialDateRange.startDate)
             .subtract(2, "years")
             .toDate()}
