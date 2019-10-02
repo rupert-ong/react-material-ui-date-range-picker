@@ -213,7 +213,7 @@ const DateRangePicker = ({
       [classes.highlight]: dayInCurrentMonth && dayIsBetween,
       [classes.firstHighlight]: dayInCurrentMonth && isStartDate,
       [classes.endHighlight]:
-        dayInCurrentMonth && isEndDate && momentDate.isAfter(startDate, "day"),
+        dayInCurrentMonth && isEndDate && momentDate.isSameOrAfter(startDate, "day"),
       [classes.disabledDay]: isDayOutsideMinAndMax
     });
 
