@@ -258,23 +258,6 @@ const DateRangePicker = ({
     }
 
     setPickerDate(newPickerDate);
-
-    /*  let fallbackDate = isPickerSettingStartDate
-      ? moment(`01/01/${yearValue}`, "MM/DD/YYYY").toDate()
-      : moment(startDate > minDate ? minDate : startDate)
-          .set({ year: yearValue })
-          .toDate();
-    if (moment(fallbackDate).isAfter(maxDate, "day"))
-      fallbackDate = moment(maxDate)
-        .set({ year: yearValue })
-        .toDate();
-
-    setPickerDate(
-      momentDate.isValid()
-        ? momentDate.set({ year: yearValue }).toDate()
-        : fallbackDate
-    );*/
-
     setYear(yearValue);
   };
 
