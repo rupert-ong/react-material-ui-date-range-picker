@@ -211,9 +211,7 @@ const DateRangePicker = ({
 
     const wrapperClassName = classNames({
       [classes.highlight]: dayInCurrentMonth && dayIsBetween,
-      [classes.firstHighlight]:
-        (dayInCurrentMonth && isStartDate) ||
-        (dayInCurrentMonth && isStartDate),
+      [classes.firstHighlight]: dayInCurrentMonth && isStartDate,
       [classes.endHighlight]:
         dayInCurrentMonth && isEndDate && momentDate.isAfter(startDate, "day"),
       [classes.disabledDay]: isDayOutsideMinAndMax
