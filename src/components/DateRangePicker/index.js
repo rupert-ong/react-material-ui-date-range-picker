@@ -254,10 +254,6 @@ const DateRangePicker = ({
   const resetTrackingState = () => {
     setIsPickerSettingStartDate(true);
     setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
-    if (moment(initialDateRange.startDate).isValid()) {
-      setPickerDate(initialDateRange.startDate);
-      setYear(initialDateRange.startDate.getFullYear());
-    }
   };
 
   const handleYearDropdownFocus = () => {
@@ -402,6 +398,10 @@ const DateRangePicker = ({
         ? moment(initialDateRange.endDate).format(dateStringFormatter)
         : ""
     });
+    if (moment(initialDateRange.startDate).isValid()) {
+      setPickerDate(initialDateRange.startDate);
+      setYear(initialDateRange.startDate.getFullYear());
+    }
     resetTrackingState();
     if (typeof onCancel === "function") onCancel(startDate, endDate);
   };
