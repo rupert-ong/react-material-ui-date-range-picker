@@ -113,6 +113,8 @@ const dateRangeReducer = (state, { type, payload }) => {
   }
 };
 
+let timerId;
+
 const createDecrementedRange = (start, stop, step = 1) =>
   Array.from({ length: (stop - start) / step + 1 }, (_, i) => stop - i * step);
 
@@ -134,7 +136,6 @@ const DateRangePicker = ({
     minDate.getFullYear(),
     maxDate.getFullYear()
   );
-  let timerId;
   const autoCorrectedDatePipe = useMemo(() => {
     return createAutoCorrectedDatePipe(dateStringFormatter.toLowerCase());
   }, [dateStringFormatter]);
@@ -199,7 +200,11 @@ const DateRangePicker = ({
     _selectedDate,
     dayInCurrentMonth
   ) => {
-    const dayIsBetween = momentDate.isBetween(startDate, endDate, "day");
+    const isDayBetweenStartAndEndDate = momentDate.isBetween(
+      startDate,
+      endDate,
+      "day"
+    );
     const isBeforeStartDateOnEndDateSelection =
       momentDate.isBefore(startDate, "day") && !isPickerSettingStartDate;
     const isStartDate = momentDate.isSame(startDate, "day");
@@ -209,20 +214,33 @@ const DateRangePicker = ({
       momentDate.isAfter(maxDate, "day") ||
       (!isPickerSettingStartDate && momentDate.isBefore(startDate, "day"));
 
+    const isHighlight = dayInCurrentMonth && isDayBetweenStartAndEndDate;
+    const isFirstHighlight = dayInCurrentMonth && isStartDate;
+    const isEndHighlight =
+      dayInCurrentMonth &&
+      isEndDate &&
+      momentDate.isSameOrAfter(startDate, "day");
+    const isDisabled = isDayOutsideMinAndMax;
+
     const wrapperClassName = classNames({
-      [classes.highlight]: dayInCurrentMonth && dayIsBetween,
-      [classes.firstHighlight]: dayInCurrentMonth && isStartDate,
-      [classes.endHighlight]:
-        dayInCurrentMonth && isEndDate && momentDate.isSameOrAfter(startDate, "day"),
-      [classes.disabledDay]: isDayOutsideMinAndMax
+      [classes.highlight]: isHighlight,
+      [classes.firstHighlight]: isFirstHighlight,
+      [classes.endHighlight]: isEndHighlight,
+      [classes.disabledDay]: isDisabled
     });
 
     const dayClassName = classNames(classes.day, {
       [classes.nonCurrentMonthDay]: !dayInCurrentMonth
     });
 
+    const dataAttributes = {};
+    if (isHighlight) dataAttributes["data-is-highlight"] = true;
+    if (isFirstHighlight) dataAttributes["data-is-first-highlight"] = true;
+    if (isEndHighlight) dataAttributes["data-is-end-highlight"] = true;
+    if (isDisabled) dataAttributes["data-is-disabled"] = true;
+
     return (
-      <div className={wrapperClassName}>
+      <div className={wrapperClassName} {...dataAttributes}>
         <IconButton
           className={dayClassName}
           disabled={isBeforeStartDateOnEndDateSelection}
@@ -236,10 +254,14 @@ const DateRangePicker = ({
   const resetTrackingState = () => {
     setIsPickerSettingStartDate(true);
     setInputErrorMessages({ ...INITIAL_ERROR_MESSAGES_STATE });
-    if (moment(startDate).isValid()) {
-      setPickerDate(startDate);
-      setYear(startDate.getFullYear());
+    if (moment(initialDateRange.startDate).isValid()) {
+      setPickerDate(initialDateRange.startDate);
+      setYear(initialDateRange.startDate.getFullYear());
     }
+  };
+
+  const handleYearDropdownFocus = () => {
+    clearTimeout(timerId);
   };
 
   const handleYearDropdownChange = e => {
@@ -264,30 +286,28 @@ const DateRangePicker = ({
     const errorMessagesObject = { [name]: null };
     const momentDate = moment(value, dateStringFormatter);
     const isStartDate = name === DATE_TYPES.START_DATE;
+    const isDateValid = momentDate.isValid() && value.match(/\d/g).length === 8;
     const isDateWithinMinMaxDateRange = momentDate.isBetween(
       minDate,
       maxDate,
       "day",
       []
     );
-
     setDateRangeInputs({
       ...dateRangeInputs,
       [name]: value
     });
 
-    errorMessagesObject[name] =
-      !momentDate.isValid() || value.match(/\d/g).length !== 8
-        ? errorMessages.invalidDate
-        : null;
+    errorMessagesObject[name] = !isDateValid ? errorMessages.invalidDate : null;
 
-    if (!isDateWithinMinMaxDateRange) {
+    if (isDateValid && !isDateWithinMinMaxDateRange) {
       errorMessagesObject[name] = isStartDate
         ? errorMessages.startDateBeforeMinDate
         : errorMessages.endDateAfterMaxDate;
     }
 
     if (
+      isDateValid &&
       isStartDate &&
       moment(endDate).isValid() &&
       momentDate.isAfter(endDate, "day")
@@ -329,11 +349,12 @@ const DateRangePicker = ({
   const handleInputBlur = name => e => {
     const isStartDate = name === DATE_TYPES.START_DATE;
 
-    if (!isStartDate) {
-      timerId = setTimeout(() => {
-        setIsPickerSettingStartDate(true);
-      }, 250);
-    }
+    // if (!isStartDate) {
+    timerId = setTimeout(() => {
+      setIsPickerSettingStartDate(true);
+      console.log("just reset isPickerSettingStartDate to true");
+    }, 750);
+    // }
     setInputsTouched(prevState => ({
       ...prevState,
       [name]: true
@@ -364,6 +385,7 @@ const DateRangePicker = ({
 
   const handleMonthChange = momentDate => {
     const dateYear = momentDate.year();
+    clearTimeout(timerId);
     if (dateYear !== year) setYear(dateYear);
   };
 
@@ -373,8 +395,12 @@ const DateRangePicker = ({
       payload: initialDateRange
     });
     setDateRangeInputs({
-      startDate: moment(initialDateRange.startDate).format(dateStringFormatter),
-      endDate: moment(initialDateRange.endDate).format(dateStringFormatter)
+      startDate: moment(initialDateRange.startDate).isValid()
+        ? moment(initialDateRange.startDate).format(dateStringFormatter)
+        : "",
+      endDate: moment(initialDateRange.endDate).isValid()
+        ? moment(initialDateRange.endDate).format(dateStringFormatter)
+        : ""
     });
     resetTrackingState();
     if (typeof onCancel === "function") onCancel(startDate, endDate);
@@ -514,6 +540,7 @@ const DateRangePicker = ({
                   <TextField
                     label="Year"
                     value={year}
+                    onFocus={handleYearDropdownFocus}
                     onChange={handleYearDropdownChange}
                     variant="outlined"
                     margin="dense"

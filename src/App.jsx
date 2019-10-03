@@ -13,6 +13,8 @@ const initialDateRange = {
     .subtract(1, "days")
     .toDate(),
   endDate: new Date()
+  /* startDate: null,
+  endDate: null */
 };
 
 function App() {
@@ -60,14 +62,14 @@ function App() {
           open={isModalOpen}
           onAccept={handleAccept}
           onCancel={handleCancel}
-          maxDate={initialDateRange.endDate}
-          /*  maxDate={moment(initialDateRange.endDate)
+          //maxDate={initialDateRange.endDate}
+          maxDate={moment(initialDateRange.endDate)
             .add(2, "years")
-            .toDate()} */
+            .toDate()}
           minDate={moment(initialDateRange.startDate)
             .subtract(2, "years")
             .toDate()}
-          // dateStringFormatter="DD/MM/YYYY"
+          dateStringFormatter="DD/MM/YYYY"
         />
       </MuiPickersUtilsProvider>
     </ThemeProvider>
